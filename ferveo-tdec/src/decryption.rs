@@ -1,10 +1,10 @@
 use std::ops::Mul;
 
-use ark_ec::{pairing::Pairing, CurveGroup, Group};
+use ark_ec::{CurveGroup, PrimeGroup, pairing::Pairing};
 use ark_ff::Field;
 use ferveo_common::serialization;
 use itertools::izip;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 
 use crate::{

@@ -9,8 +9,8 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    assert_no_share_duplicates, refresh, AggregatedTranscript, Error,
-    EthereumAddress, PubliclyVerifiableSS, Result, UpdateTranscript, Validator,
+    AggregatedTranscript, Error, EthereumAddress, PubliclyVerifiableSS, Result,
+    UpdateTranscript, Validator, assert_no_share_duplicates, refresh,
 };
 
 pub type DomainIndexMap<E> = HashMap<u32, DomainPoint<E>>;
@@ -269,9 +269,9 @@ impl<E: Pairing> PubliclyVerifiableDkg<E> {
 #[cfg(test)]
 mod test_dkg_init {
     use crate::{
+        DkgParams,
         dkg::{PubliclyVerifiableDkg, Validator},
         test_common::*,
-        DkgParams,
     };
 
     /// Test that dkg fails to start if the `me` input
@@ -292,7 +292,10 @@ mod test_dkg_init {
             &unknown_validator,
         )
         .unwrap_err();
-        assert_eq!(err.to_string(), "Expected validator to be a part of the DKG validator set: 0x0000000000000000000000000000000000000005")
+        assert_eq!(
+            err.to_string(),
+            "Expected validator to be a part of the DKG validator set: 0x0000000000000000000000000000000000000005"
+        )
     }
 }
 
@@ -301,7 +304,7 @@ mod test_dkg_init {
 mod test_dealing {
 
     use crate::{
-        test_common::*, DkgParams, Error, PubliclyVerifiableDkg, Validator,
+        DkgParams, Error, PubliclyVerifiableDkg, Validator, test_common::*,
     };
 
     /// Check that the canonical share indices of validators are expected and enforced

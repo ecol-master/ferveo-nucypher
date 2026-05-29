@@ -1,27 +1,27 @@
 use std::{collections::HashMap, hash::Hash, marker::PhantomData, ops::Mul};
 
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, Group};
+use ark_ec::{AffineRepr, CurveGroup, PrimeGroup, pairing::Pairing};
 use ark_ff::Zero;
 use ark_poly::{
-    polynomial::univariate::DensePolynomial, DenseUVPolynomial,
-    EvaluationDomain, Polynomial,
+    DenseUVPolynomial, EvaluationDomain, Polynomial,
+    polynomial::univariate::DensePolynomial,
 };
-use ferveo_common::{serialization, Keypair, PublicKey};
+use ferveo_common::{Keypair, PublicKey, serialization};
 use ferveo_tdec::{
     BlindedKeyShare, CiphertextHeader, DecryptionSharePrecomputed,
     DecryptionShareSimple, DomainPoint, ShareCommitment,
 };
 use itertools::Itertools;
 use rand::RngCore;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 use subproductdomain::fast_multiexp;
 use zeroize::{self, Zeroize, ZeroizeOnDrop};
 
 use crate::{
-    assert_no_share_duplicates, batch_to_projective_g1, batch_to_projective_g2,
     Error, HandoverTranscript, PubliclyVerifiableDkg, Result,
     UpdatableBlindedKeyShare, UpdateTranscript, Validator,
+    assert_no_share_duplicates, batch_to_projective_g1, batch_to_projective_g2,
 };
 
 /// Marker struct for unaggregated PVSS transcripts
@@ -224,7 +224,7 @@ pub fn verify_validator_share<E: Pairing>(
     // e(G,Y) = e(A, ek)
     // TODO: consider using multipairing - Issue #192
     let is_valid =
-        E::pairing(E::G1::generator(), *y_i) == E::pairing(a_i, ek_i);
+        E::pairing(E::G1::generator(), *y_i) == E::pairing(*a_i, ek_i);
     Ok(is_valid)
 }
 
@@ -699,9 +699,11 @@ mod test_pvss {
         // Check that the full verify returns true
         assert!(aggregate.verify_full(&dkg).unwrap());
         // Check that the verification of aggregation passes
-        assert!(aggregate
-            .verify_aggregation(&dkg, &pvss_list)
-            .expect("Test failed"));
+        assert!(
+            aggregate
+                .verify_aggregation(&dkg, &pvss_list)
+                .expect("Test failed")
+        );
     }
 
     /// Check that if the aggregated PVSS transcript has an

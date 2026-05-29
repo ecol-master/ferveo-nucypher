@@ -5,7 +5,7 @@ use ark_bls12_381::Bls12_381;
 pub use ark_bls12_381::Bls12_381 as E;
 use ark_ec::pairing::Pairing;
 use ferveo_common::Keypair;
-use rand::{seq::SliceRandom, Rng};
+use rand::{Rng, seq::SliceRandom};
 
 use crate::{
     DkgParams, EthereumAddress, PubliclyVerifiableDkg, PubliclyVerifiableSS,

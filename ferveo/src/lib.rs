@@ -1,14 +1,5 @@
 #![warn(rust_2018_idioms)]
 
-#[cfg(feature = "bindings-wasm")]
-extern crate alloc;
-
-#[cfg(feature = "bindings-python")]
-pub mod bindings_python;
-
-#[cfg(feature = "bindings-wasm")]
-pub mod bindings_wasm;
-
 pub mod api;
 pub mod dkg;
 pub mod primitives;
@@ -39,7 +30,9 @@ pub enum Error {
     UnknownDealer(EthereumAddress),
 
     /// DKG received a PVSS transcript from a dealer that has already been dealt.
-    #[error("DKG received a PVSS transcript from a dealer that has already been dealt: {0}")]
+    #[error(
+        "DKG received a PVSS transcript from a dealer that has already been dealt: {0}"
+    )]
     DuplicateDealer(EthereumAddress),
 
     /// DKG received an invalid transcript for which optimistic verification failed
@@ -85,7 +78,9 @@ pub enum Error {
     InvalidShareUpdate,
 
     /// Failed to produce a precomputed variant decryption share
-    #[error("Invalid DKG parameters for precomputed variant: number of shares {0}, threshold {1}")]
+    #[error(
+        "Invalid DKG parameters for precomputed variant: number of shares {0}, threshold {1}"
+    )]
     InvalidDkgParametersForPrecomputedVariant(u32, u32),
 
     /// DKG may not contain duplicated share indices
@@ -97,7 +92,9 @@ pub enum Error {
     NoTranscriptsToAggregate,
 
     /// The number of messages may not be greater than the number of validators
-    #[error("Invalid aggregate verification parameters: number of validators {0}, number of messages: {1}")]
+    #[error(
+        "Invalid aggregate verification parameters: number of validators {0}, number of messages: {1}"
+    )]
     InvalidAggregateVerificationParameters(u32, u32),
 
     /// Too many transcripts received by the DKG
@@ -124,8 +121,8 @@ mod test_dkg_full {
         self, DecryptionSharePrecomputed, DecryptionShareSimple, SecretBox,
         ShareCommitment, SharedSecret,
     };
-    use itertools::{izip, Itertools};
-    use rand::{seq::SliceRandom, Rng};
+    use itertools::{Itertools, izip};
+    use rand::{Rng, seq::SliceRandom};
     use test_case::test_case;
 
     use super::*;
@@ -144,10 +141,12 @@ mod test_dkg_full {
     ) {
         let server_aggregate =
             AggregatedTranscript::from_transcripts(transcripts).unwrap();
-        assert!(server_aggregate
-            .aggregate
-            .verify_aggregation(dkg, transcripts)
-            .unwrap());
+        assert!(
+            server_aggregate
+                .aggregate
+                .verify_aggregation(dkg, transcripts)
+                .unwrap()
+        );
 
         let decryption_shares: Vec<DecryptionShareSimple<E>> =
             validator_keypairs
@@ -202,10 +201,12 @@ mod test_dkg_full {
             .collect::<Vec<_>>();
         let local_aggregate =
             AggregatedTranscript::from_transcripts(&transcripts).unwrap();
-        assert!(local_aggregate
-            .aggregate
-            .verify_aggregation(&dkg, &transcripts)
-            .unwrap());
+        assert!(
+            local_aggregate
+                .aggregate
+                .verify_aggregation(&dkg, &transcripts)
+                .unwrap()
+        );
         let ciphertext = ferveo_tdec::encrypt::<E>(
             SecretBox::new(MSG.to_vec()),
             AAD,
@@ -254,10 +255,12 @@ mod test_dkg_full {
             .collect::<Vec<_>>();
         let local_aggregate =
             AggregatedTranscript::from_transcripts(&transcripts).unwrap();
-        assert!(local_aggregate
-            .aggregate
-            .verify_aggregation(&dkg, &transcripts)
-            .unwrap());
+        assert!(
+            local_aggregate
+                .aggregate
+                .verify_aggregation(&dkg, &transcripts)
+                .unwrap()
+        );
         let ciphertext = ferveo_tdec::encrypt::<E>(
             SecretBox::new(MSG.to_vec()),
             AAD,
@@ -339,10 +342,12 @@ mod test_dkg_full {
             .collect::<Vec<_>>();
         let local_aggregate =
             AggregatedTranscript::from_transcripts(&transcripts).unwrap();
-        assert!(local_aggregate
-            .aggregate
-            .verify_aggregation(&dkg, &transcripts)
-            .unwrap());
+        assert!(
+            local_aggregate
+                .aggregate
+                .verify_aggregation(&dkg, &transcripts)
+                .unwrap()
+        );
         let ciphertext = ferveo_tdec::encrypt::<E>(
             SecretBox::new(MSG.to_vec()),
             AAD,
@@ -422,10 +427,12 @@ mod test_dkg_full {
             .collect::<Vec<_>>();
         let local_aggregate =
             AggregatedTranscript::from_transcripts(&transcripts).unwrap();
-        assert!(local_aggregate
-            .aggregate
-            .verify_aggregation(&dkg, &transcripts)
-            .unwrap());
+        assert!(
+            local_aggregate
+                .aggregate
+                .verify_aggregation(&dkg, &transcripts)
+                .unwrap()
+        );
         let ciphertext = ferveo_tdec::encrypt::<E>(
             SecretBox::new(MSG.to_vec()),
             AAD,
@@ -614,10 +621,12 @@ mod test_dkg_full {
         // combined into a joint AggregateTranscript.
         let local_aggregate =
             AggregatedTranscript::from_transcripts(&transcripts).unwrap();
-        assert!(local_aggregate
-            .aggregate
-            .verify_aggregation(&dkg, &transcripts)
-            .unwrap());
+        assert!(
+            local_aggregate
+                .aggregate
+                .verify_aggregation(&dkg, &transcripts)
+                .unwrap()
+        );
 
         // Ciphertext created from the aggregate public key
         let ciphertext = ferveo_tdec::encrypt::<E>(
@@ -731,10 +740,12 @@ mod test_dkg_full {
         // combined into a joint AggregateTranscript.
         let local_aggregate =
             AggregatedTranscript::from_transcripts(&transcripts).unwrap();
-        assert!(local_aggregate
-            .aggregate
-            .verify_aggregation(&dkg, &transcripts)
-            .unwrap());
+        assert!(
+            local_aggregate
+                .aggregate
+                .verify_aggregation(&dkg, &transcripts)
+                .unwrap()
+        );
 
         // Ciphertext created from the aggregate public key
         let ciphertext = ferveo_tdec::encrypt::<E>(

@@ -62,12 +62,12 @@ pub mod test_common {
     use std::ops::Mul;
 
     pub use ark_bls12_381::Bls12_381 as EllipticCurve;
-    use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+    use ark_ec::{AffineRepr, CurveGroup, pairing::Pairing};
     pub use ark_ff::UniformRand;
     use ark_ff::{Field, Zero};
     use ark_poly::{
-        univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain,
-        Polynomial,
+        DenseUVPolynomial, EvaluationDomain, Polynomial,
+        univariate::DensePolynomial,
     };
     use itertools::izip;
     use subproductdomain::fast_multiexp;
@@ -207,8 +207,8 @@ pub mod test_common {
 mod tests {
     use std::ops::Mul;
 
-    use ark_ec::{pairing::Pairing, CurveGroup};
-    use ark_std::{test_rng, UniformRand};
+    use ark_ec::{CurveGroup, pairing::Pairing};
+    use ark_std::{UniformRand, test_rng};
     use ferveo_common::{FromBytes, ToBytes};
     use rand::seq::IteratorRandom;
 
@@ -255,13 +255,17 @@ mod tests {
         // Malformed the ciphertext
         let mut ciphertext = ciphertext.clone();
         ciphertext.ciphertext[0] += 1;
-        assert!(decrypt_with_shared_secret(&ciphertext, aad, shared_secret)
-            .is_err());
+        assert!(
+            decrypt_with_shared_secret(&ciphertext, aad, shared_secret)
+                .is_err()
+        );
 
         // Malformed the AAD
         let aad = "bad aad".as_bytes();
-        assert!(decrypt_with_shared_secret(&ciphertext, aad, shared_secret)
-            .is_err());
+        assert!(
+            decrypt_with_shared_secret(&ciphertext, aad, shared_secret)
+                .is_err()
+        );
     }
 
     #[test]
@@ -278,9 +282,11 @@ mod tests {
             encrypt::<E>(SecretBox::new(msg), aad, &pubkey, rng).unwrap();
 
         let bad_aad = "bad aad".as_bytes();
-        assert!(contexts[0]
-            .create_share(&ciphertext.header().unwrap(), bad_aad)
-            .is_err());
+        assert!(
+            contexts[0]
+                .create_share(&ciphertext.header().unwrap(), bad_aad)
+                .is_err()
+        );
     }
 
     #[test]

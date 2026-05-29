@@ -1,21 +1,21 @@
 use std::ops::Mul;
 
-use ark_ec::{pairing::Pairing, AffineRepr};
+use ark_ec::{AffineRepr, pairing::Pairing};
 use ark_ff::{One, UniformRand};
 use ark_serialize::CanonicalSerialize;
 use chacha20poly1305::{
-    aead::{generic_array::GenericArray, Aead, KeyInit, Payload},
     ChaCha20Poly1305,
+    aead::{Aead, KeyInit, Payload, generic_array::GenericArray},
 };
 use ferveo_common::serialization;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sha2::{digest::Digest, Sha256};
+use sha2::{Sha256, digest::Digest};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    htp_bls12381_g2, DkgPublicKey, Error, PrivateKeyShare, Result, SecretBox,
-    SharedSecret,
+    DkgPublicKey, Error, PrivateKeyShare, Result, SecretBox, SharedSecret,
+    htp_bls12381_g2,
 };
 
 #[serde_as]

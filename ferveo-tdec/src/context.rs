@@ -1,9 +1,9 @@
 use ark_ec::pairing::Pairing;
 
 use crate::{
-    prepare_combine_simple, BlindedKeyShare, CiphertextHeader,
-    DecryptionSharePrecomputed, DecryptionShareSimple, PrivateKeyShare, Result,
-    ShareCommitment,
+    BlindedKeyShare, CiphertextHeader, DecryptionSharePrecomputed,
+    DecryptionShareSimple, PrivateKeyShare, Result, ShareCommitment,
+    prepare_combine_simple,
 };
 
 #[derive(Clone, Debug)]

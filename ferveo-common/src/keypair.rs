@@ -1,19 +1,19 @@
 use std::{cmp::Ordering, fmt::Formatter, io, ops::Mul};
 
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+use ark_ec::{AffineRepr, CurveGroup, pairing::Pairing};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
-    rand::{prelude::StdRng, RngCore, SeedableRng},
     UniformRand,
+    rand::{RngCore, SeedableRng, prelude::StdRng},
 };
 use generic_array::{
-    typenum::{Unsigned, U96},
     GenericArray,
+    typenum::{U96, Unsigned},
 };
 use serde::*;
 use serde_with::serde_as;
 
-use crate::{serialization, Error, Result};
+use crate::{Error, Result, serialization};
 
 // Normally, we would use a custom trait for this, but we can't because
 // the arkworks will not let us create a blanket implementation for G1Affine

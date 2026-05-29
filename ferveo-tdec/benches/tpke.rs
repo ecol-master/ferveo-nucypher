@@ -2,7 +2,7 @@
 
 use ark_bls12_381::{Bls12_381, Fr};
 use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion,
+    BenchmarkId, Criterion, black_box, criterion_group, criterion_main,
 };
 use ferveo_nucypher_tdec::{test_common::setup_simple, *};
 use rand::prelude::StdRng;
