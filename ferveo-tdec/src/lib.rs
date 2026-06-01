@@ -2,6 +2,7 @@
 use ark_ec::pairing::Pairing;
 
 mod ciphertext;
+mod codec;
 mod combine;
 mod context;
 mod decryption;
@@ -9,9 +10,11 @@ mod hash_to_curve;
 mod key_share;
 
 pub use ciphertext::{
-    Ciphertext, CiphertextHeader, decrypt_symmetric,
-    decrypt_with_shared_secret, encrypt,
+    Ciphertext, CiphertextHeader, decrypt_symmetric, decrypt_symmetric_value,
+    decrypt_value_with_shared_secret, decrypt_with_shared_secret, encrypt,
+    encrypt_value,
 };
+pub use codec::Codec;
 pub use combine::{
     SharedSecret, lagrange_basis_at, prepare_combine_simple,
     share_combine_precomputed, share_combine_simple,
@@ -30,10 +33,6 @@ pub use key_share::{
 
 #[cfg(feature = "bls12_381")]
 pub mod bls12_381;
-
-#[cfg(feature = "api")]
-#[deprecated(note = "use ferveo_tdec::bls12_381 instead")]
-pub use bls12_381 as api;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -56,6 +55,10 @@ pub enum Error {
 
     #[error(transparent)]
     ArkSerializeError(#[from] ark_serialize::SerializationError),
+
+    #[cfg(feature = "parity-codec")]
+    #[error(transparent)]
+    ParityCodecError(#[from] parity_scale_codec::Error),
 }
 
 pub type DomainPoint<E> = <E as Pairing>::ScalarField;
@@ -208,7 +211,7 @@ pub mod test_common {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "parity-codec"))]
 mod tests {
     use std::ops::Mul;
 
@@ -330,6 +333,38 @@ mod tests {
         let result =
             decrypt_with_shared_secret(&ciphertext, aad, &bash_shared_secret);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn tdec_simple_variant_codec_e2e() {
+        let mut rng = &mut test_rng();
+        let shares_num = 16;
+        let threshold = shares_num * 2 / 3;
+        let msg = "my-msg".to_string();
+        let aad = "my-aad".as_bytes();
+
+        let (pubkey, _, contexts) =
+            setup_simple::<E>(shares_num, threshold, &mut rng);
+
+        let ciphertext =
+            encrypt_value::<E, _>(&msg, aad, &pubkey, rng).unwrap();
+
+        let decryption_shares: Vec<_> = contexts
+            .iter()
+            .map(|c| {
+                c.create_share(&ciphertext.header().unwrap(), aad).unwrap()
+            })
+            .take(threshold)
+            .collect();
+        let selected_contexts =
+            contexts[0].public_decryption_contexts[..threshold].to_vec();
+        let shared_secret =
+            create_shared_secret_simple(&selected_contexts, &decryption_shares);
+
+        let plaintext =
+            decrypt_value_with_shared_secret(&ciphertext, aad, &shared_secret)
+                .unwrap();
+        assert_eq!(plaintext, msg);
     }
 
     #[test]

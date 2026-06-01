@@ -31,6 +31,7 @@ sha2 = { workspace = true }
 subproductdomain = { package = "subproductdomain-nucypher", path = "../subproductdomain", version = "^0.4.0" }
 thiserror = { workspace = true }
 zeroize = { workspace = true, features = ["derive"] }
+parity-scale-codec = {workspace = true, optional = true}
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["html_reports"] }
@@ -51,6 +52,7 @@ path = "benches/arkworks.rs"
 harness = false
 
 [features]
-api = ["bls12_381"]
+default = ["bls12_381", "parity-codec"]
 bls12_381 = []
+parity-codec = ["dep:parity-scale-codec"]
 test-common = []

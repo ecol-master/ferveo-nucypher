@@ -14,7 +14,8 @@ use sha2::{Sha256, digest::Digest};
 use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::{
-    DkgPublicKey, Error, PrivateKeyShare, Result, SharedSecret, htp_bls12381_g2,
+    Codec, DkgPublicKey, Error, PrivateKeyShare, Result, SharedSecret,
+    htp_bls12381_g2,
 };
 
 #[serde_as]
@@ -108,6 +109,32 @@ where
     E: Pairing,
     T: AsRef<[u8]>,
 {
+    encrypt_bytes_as(message.as_ref(), aad, pubkey, rng)
+}
+
+pub fn encrypt_value<E, T>(
+    message: &T,
+    aad: &[u8],
+    pubkey: &DkgPublicKey<E>,
+    rng: &mut impl rand::Rng,
+) -> Result<Ciphertext<E, T>>
+where
+    E: Pairing,
+    T: Codec,
+{
+    let encoded = message.encode()?;
+    encrypt_bytes_as(&encoded, aad, pubkey, rng)
+}
+
+fn encrypt_bytes_as<E, T>(
+    message: &[u8],
+    aad: &[u8],
+    pubkey: &DkgPublicKey<E>,
+    rng: &mut impl rand::Rng,
+) -> Result<Ciphertext<E, T>>
+where
+    E: Pairing,
+{
     // r
     let rand_element = E::ScalarField::rand(rng);
     // g
@@ -124,10 +151,7 @@ where
     let nonce = Nonce::from_commitment::<E>(commitment)?;
     let shared_secret = SharedSecret::<E>(product);
 
-    let payload = Payload {
-        msg: message.as_ref(),
-        aad,
-    };
+    let payload = Payload { msg: message, aad };
     let ciphertext = shared_secret_to_chacha(&shared_secret)?
         .encrypt(&nonce.0, payload) // TODO: Consider encrypt_in_place (#196)
         .map_err(Error::SymmetricEncryptionError)?
@@ -163,6 +187,19 @@ pub fn decrypt_symmetric<E: Pairing, T>(
     decrypt_with_shared_secret_unchecked(ciphertext, aad, &shared_secret)
 }
 
+pub fn decrypt_symmetric_value<E, T>(
+    ciphertext: &Ciphertext<E, T>,
+    aad: &[u8],
+    private_key: &PrivateKeyShare<E>,
+) -> Result<T>
+where
+    E: Pairing,
+    T: Codec,
+{
+    let plaintext = decrypt_symmetric(ciphertext, aad, private_key)?;
+    T::decode(&plaintext)
+}
+
 fn decrypt_with_shared_secret_unchecked<E: Pairing, T>(
     ciphertext: &Ciphertext<E, T>,
     aad: &[u8],
@@ -189,6 +226,19 @@ pub fn decrypt_with_shared_secret<E: Pairing, T>(
 ) -> Result<Vec<u8>> {
     ciphertext.check(aad)?;
     decrypt_with_shared_secret_unchecked(ciphertext, aad, shared_secret)
+}
+
+pub fn decrypt_value_with_shared_secret<E, T>(
+    ciphertext: &Ciphertext<E, T>,
+    aad: &[u8],
+    shared_secret: &SharedSecret<E>,
+) -> Result<T>
+where
+    E: Pairing,
+    T: Codec,
+{
+    let plaintext = decrypt_with_shared_secret(ciphertext, aad, shared_secret)?;
+    T::decode(&plaintext)
 }
 
 fn sha256(input: &[u8]) -> [u8; 32] {
