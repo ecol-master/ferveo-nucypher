@@ -10,9 +10,8 @@ mod hash_to_curve;
 mod key_share;
 
 pub use ciphertext::{
-    Ciphertext, CiphertextHeader, decrypt_symmetric, decrypt_symmetric_value,
-    decrypt_value_with_shared_secret, decrypt_with_shared_secret, encrypt,
-    encrypt_value,
+    Ciphertext, CiphertextHeader, Raw, decrypt, decrypt_raw, decrypt_symmetric,
+    decrypt_symmetric_raw, encrypt, encrypt_raw,
 };
 pub use codec::Codec;
 pub use combine::{
@@ -222,6 +221,7 @@ mod tests {
 
     use crate::{
         DecryptionSharePrecomputed,
+        ciphertext::RawCiphertext,
         test_common::{create_shared_secret_simple, setup_simple, *},
     };
 
@@ -239,7 +239,7 @@ mod tests {
 
         let (pubkey, _, _) = setup_simple::<E>(threshold, shares_num, rng);
 
-        let ciphertext = encrypt::<E, _>(msg, aad, &pubkey, rng).unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         let serialized = ciphertext.to_bytes().unwrap();
         let deserialized: Ciphertext<E> =
@@ -248,25 +248,19 @@ mod tests {
         assert_eq!(serialized, deserialized.to_bytes().unwrap())
     }
 
-    fn test_ciphertext_validation_fails<E: Pairing, T: Clone>(
+    fn test_ciphertext_validation_fails<E: Pairing>(
         aad: &[u8],
-        ciphertext: &Ciphertext<E, T>,
+        ciphertext: &RawCiphertext<E>,
         shared_secret: &SharedSecret<E>,
     ) {
         // Malformed the ciphertext
         let mut ciphertext = ciphertext.clone();
         ciphertext.ciphertext[0] += 1;
-        assert!(
-            decrypt_with_shared_secret(&ciphertext, aad, shared_secret)
-                .is_err()
-        );
+        assert!(decrypt_raw(&ciphertext, aad, shared_secret).is_err());
 
         // Malformed the AAD
         let aad = "bad aad".as_bytes();
-        assert!(
-            decrypt_with_shared_secret(&ciphertext, aad, shared_secret)
-                .is_err()
-        );
+        assert!(decrypt_raw(&ciphertext, aad, shared_secret).is_err());
     }
 
     #[test]
@@ -279,7 +273,7 @@ mod tests {
 
         let (pubkey, _, contexts) =
             setup_simple::<E>(shares_num, threshold, rng);
-        let ciphertext = encrypt::<E, _>(msg, aad, &pubkey, rng).unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         let bad_aad = "bad aad".as_bytes();
         assert!(
@@ -300,8 +294,7 @@ mod tests {
         let (pubkey, _, contexts) =
             setup_simple::<E>(shares_num, threshold, &mut rng);
 
-        let ciphertext =
-            encrypt::<E, _>(msg.clone(), aad, &pubkey, rng).unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         // We need at least threshold shares to decrypt
         let decryption_shares: Vec<_> = contexts
@@ -316,9 +309,7 @@ mod tests {
         let shared_secret =
             create_shared_secret_simple(&selected_contexts, &decryption_shares);
 
-        let plaintext =
-            decrypt_with_shared_secret(&ciphertext, aad, &shared_secret)
-                .unwrap();
+        let plaintext = decrypt_raw(&ciphertext, aad, &shared_secret).unwrap();
         assert_eq!(plaintext, msg.as_bytes());
 
         test_ciphertext_validation_fails(aad, &ciphertext, &shared_secret);
@@ -330,8 +321,7 @@ mod tests {
             &not_enough_contexts,
             &not_enough_dec_shares,
         );
-        let result =
-            decrypt_with_shared_secret(&ciphertext, aad, &bash_shared_secret);
+        let result = decrypt_raw(&ciphertext, aad, &bash_shared_secret);
         assert!(result.is_err());
     }
 
@@ -346,8 +336,7 @@ mod tests {
         let (pubkey, _, contexts) =
             setup_simple::<E>(shares_num, threshold, &mut rng);
 
-        let ciphertext =
-            encrypt_value::<E, _>(&msg, aad, &pubkey, rng).unwrap();
+        let ciphertext = encrypt::<E, _>(&msg, aad, &pubkey, rng).unwrap();
 
         let decryption_shares: Vec<_> = contexts
             .iter()
@@ -361,9 +350,7 @@ mod tests {
         let shared_secret =
             create_shared_secret_simple(&selected_contexts, &decryption_shares);
 
-        let plaintext =
-            decrypt_value_with_shared_secret(&ciphertext, aad, &shared_secret)
-                .unwrap();
+        let plaintext = decrypt(&ciphertext, aad, &shared_secret).unwrap();
         assert_eq!(plaintext, msg);
     }
 
@@ -377,8 +364,7 @@ mod tests {
 
         let (pubkey, _, contexts) =
             setup_precomputed::<E>(shares_num, threshold, &mut rng);
-        let ciphertext =
-            encrypt::<E, _>(msg.clone(), aad, &pubkey, rng).unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         let selected_participants =
             (0..threshold).choose_multiple(rng, threshold);
@@ -402,9 +388,7 @@ mod tests {
             .collect::<Vec<DecryptionSharePrecomputed<_>>>();
 
         let shared_secret = share_combine_precomputed::<E>(&decryption_shares);
-        let plaintext =
-            decrypt_with_shared_secret(&ciphertext, aad, &shared_secret)
-                .unwrap();
+        let plaintext = decrypt_raw(&ciphertext, aad, &shared_secret).unwrap();
         assert_eq!(plaintext, msg);
 
         test_ciphertext_validation_fails(aad, &ciphertext, &shared_secret);
@@ -413,8 +397,7 @@ mod tests {
         let not_enough_dec_shares = decryption_shares[..threshold - 1].to_vec();
         let bash_shared_secret =
             share_combine_precomputed(&not_enough_dec_shares);
-        let result =
-            decrypt_with_shared_secret(&ciphertext, aad, &bash_shared_secret);
+        let result = decrypt_raw(&ciphertext, aad, &bash_shared_secret);
         assert!(result.is_err());
     }
 
@@ -429,7 +412,7 @@ mod tests {
         let (pubkey, _, contexts) =
             setup_simple::<E>(shares_num, threshold, &mut rng);
 
-        let ciphertext = encrypt::<E, _>(msg, aad, &pubkey, rng).unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         let decryption_shares: Vec<_> = contexts
             .iter()

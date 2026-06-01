@@ -17,7 +17,7 @@ where
     T: parity_scale_codec::Encode + parity_scale_codec::Decode,
 {
     fn encode(&self) -> Result<Vec<u8>> {
-        Ok(<T as parity_scale_codec::Encode>::encode(&self))
+        Ok(<T as parity_scale_codec::Encode>::encode(self))
     }
 
     fn decode(bytes: &[u8]) -> Result<Self> {

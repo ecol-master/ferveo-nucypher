@@ -46,8 +46,7 @@ impl SetupSimple {
             setup_simple::<E>(shares_num, threshold, rng);
 
         // Ciphertext.commitment is already computed to match U
-        let ciphertext =
-            encrypt::<E, _>(msg.clone(), aad, &pubkey, rng).unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         // Creating decryption shares
         let decryption_shares: Vec<_> = contexts
@@ -235,7 +234,7 @@ pub fn bench_share_encrypt_decrypt(c: &mut Criterion) {
                 let setup = setup.clone();
                 black_box(
                     encrypt::<E, _>(
-                        setup.shared.msg,
+                        &setup.shared.msg,
                         &setup.shared.aad,
                         &setup.shared.pubkey,
                         &mut rng,
@@ -248,7 +247,7 @@ pub fn bench_share_encrypt_decrypt(c: &mut Criterion) {
             let setup = SetupSimple::new(shares_num, msg_size, rng);
             move || {
                 black_box(
-                    decrypt_with_shared_secret::<E, _>(
+                    decrypt_raw::<E>(
                         &setup.shared.ciphertext,
                         &setup.shared.aad,
                         &setup.shared.shared_secret,

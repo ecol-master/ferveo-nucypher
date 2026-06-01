@@ -207,7 +207,7 @@ mod test_dkg_full {
                 .verify_aggregation(&dkg, &transcripts)
                 .unwrap()
         );
-        let ciphertext = ferveo_tdec::encrypt::<E, _>(
+        let ciphertext = ferveo_tdec::encrypt_raw::<E>(
             MSG,
             AAD,
             &local_aggregate.public_key,
@@ -222,12 +222,8 @@ mod test_dkg_full {
             &transcripts,
         );
 
-        let plaintext = ferveo_tdec::decrypt_with_shared_secret(
-            &ciphertext,
-            AAD,
-            &shared_secret,
-        )
-        .unwrap();
+        let plaintext =
+            ferveo_tdec::decrypt_raw(&ciphertext, AAD, &shared_secret).unwrap();
         assert_eq!(plaintext, MSG);
     }
 
@@ -261,7 +257,7 @@ mod test_dkg_full {
                 .verify_aggregation(&dkg, &transcripts)
                 .unwrap()
         );
-        let ciphertext = ferveo_tdec::encrypt::<E, _>(
+        let ciphertext = ferveo_tdec::encrypt_raw::<E>(
             MSG,
             AAD,
             &local_aggregate.public_key,
@@ -315,12 +311,8 @@ mod test_dkg_full {
         // Decrypt with precomputed variant
         let shared_secret =
             ferveo_tdec::share_combine_precomputed::<E>(&decryption_shares);
-        let plaintext = ferveo_tdec::decrypt_with_shared_secret(
-            &ciphertext,
-            AAD,
-            &shared_secret,
-        )
-        .unwrap();
+        let plaintext =
+            ferveo_tdec::decrypt_raw(&ciphertext, AAD, &shared_secret).unwrap();
         assert_eq!(plaintext, MSG);
     }
 
@@ -348,7 +340,7 @@ mod test_dkg_full {
                 .verify_aggregation(&dkg, &transcripts)
                 .unwrap()
         );
-        let ciphertext = ferveo_tdec::encrypt::<E, _>(
+        let ciphertext = ferveo_tdec::encrypt_raw::<E>(
             MSG,
             AAD,
             &local_aggregate.public_key,
@@ -433,7 +425,7 @@ mod test_dkg_full {
                 .verify_aggregation(&dkg, &transcripts)
                 .unwrap()
         );
-        let ciphertext = ferveo_tdec::encrypt::<E, _>(
+        let ciphertext = ferveo_tdec::encrypt_raw::<E>(
             MSG,
             AAD,
             &local_aggregate.public_key,
@@ -629,7 +621,7 @@ mod test_dkg_full {
         );
 
         // Ciphertext created from the aggregate public key
-        let ciphertext = ferveo_tdec::encrypt::<E, _>(
+        let ciphertext = ferveo_tdec::encrypt_raw::<E>(
             MSG,
             AAD,
             &local_aggregate.public_key,
@@ -748,7 +740,7 @@ mod test_dkg_full {
         );
 
         // Ciphertext created from the aggregate public key
-        let ciphertext = ferveo_tdec::encrypt::<E, _>(
+        let ciphertext = ferveo_tdec::encrypt_raw::<E>(
             MSG,
             AAD,
             &local_aggregate.public_key,

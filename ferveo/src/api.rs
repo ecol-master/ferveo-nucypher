@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt, io};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ferveo_common::serialization;
-use ferveo_tdec::bls12_381 as tdec_bls12_381;
 pub use ferveo_tdec::{
     DomainPoint,
     bls12_381::{
@@ -12,6 +11,7 @@ pub use ferveo_tdec::{
         share_combine_simple,
     },
 };
+use ferveo_tdec::{Raw, bls12_381 as tdec_bls12_381};
 use generic_array::{
     GenericArray,
     typenum::{U48, Unsigned},
@@ -48,32 +48,28 @@ pub fn from_bytes<T: CanonicalDeserialize>(bytes: &[u8]) -> Result<T> {
     Ok(item)
 }
 
-pub fn encrypt<T: AsRef<[u8]>>(
-    message: T,
+pub fn encrypt(
+    message: impl AsRef<[u8]>,
     aad: &[u8],
     public_key: &DkgPublicKey,
-) -> Result<Ciphertext<T>> {
+) -> Result<Ciphertext> {
     let mut rng = thread_rng();
     let ciphertext =
-        tdec_bls12_381::encrypt(message, aad, &public_key.0, &mut rng)?;
+        tdec_bls12_381::encrypt_raw(message, aad, &public_key.0, &mut rng)?;
     Ok(Ciphertext(ciphertext))
 }
 
-pub fn decrypt_with_shared_secret<T>(
-    ciphertext: &Ciphertext<T>,
+pub fn decrypt_with_shared_secret(
+    ciphertext: &Ciphertext,
     aad: &[u8],
     shared_secret: &SharedSecret,
 ) -> Result<Vec<u8>> {
-    tdec_bls12_381::decrypt_with_shared_secret(
-        &ciphertext.0,
-        aad,
-        &shared_secret.0,
-    )
-    .map_err(Error::from)
+    tdec_bls12_381::decrypt_raw(&ciphertext.0, aad, &shared_secret.0)
+        .map_err(Error::from)
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Eq)]
-pub struct Ciphertext<T = Vec<u8>>(tdec_bls12_381::Ciphertext<T>);
+pub struct Ciphertext<T = Raw>(tdec_bls12_381::Ciphertext<T>);
 
 impl<T> Ciphertext<T> {
     pub fn header(&self) -> Result<CiphertextHeader> {

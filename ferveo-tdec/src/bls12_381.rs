@@ -28,8 +28,7 @@ pub type CiphertextHeader = crate::CiphertextHeader<E>;
 pub type TargetField = <E as ark_ec::pairing::Pairing>::TargetField;
 
 pub use crate::{
-    Codec, SharedSecret, decrypt_symmetric, decrypt_symmetric_value,
-    decrypt_value_with_shared_secret, decrypt_with_shared_secret, encrypt,
-    encrypt_value, prepare_combine_simple, share_combine_precomputed,
+    Codec, SharedSecret, decrypt, decrypt_raw, decrypt_symmetric, encrypt,
+    encrypt_raw, prepare_combine_simple, share_combine_precomputed,
     share_combine_simple,
 };
