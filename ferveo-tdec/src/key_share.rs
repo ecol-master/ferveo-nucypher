@@ -1,15 +1,15 @@
 use std::{collections::HashMap, ops::Mul};
 
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{CurveGroup, pairing::Pairing};
 use ark_ff::Field;
-use ferveo_common::{serialization, Keypair};
+use ferveo_common::{Keypair, serialization};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
-    prepare_combine_simple, CiphertextHeader, DecryptionSharePrecomputed,
-    DecryptionShareSimple, DomainPoint, Result,
+    CiphertextHeader, DecryptionSharePrecomputed, DecryptionShareSimple,
+    DomainPoint, Result, prepare_combine_simple,
 };
 
 #[serde_as]

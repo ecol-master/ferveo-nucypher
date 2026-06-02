@@ -2,7 +2,7 @@
 
 use ark_bls12_381::{Bls12_381, Fr};
 use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion,
+    BenchmarkId, Criterion, black_box, criterion_group, criterion_main,
 };
 use ferveo_nucypher_tdec::{test_common::setup_simple, *};
 use rand::prelude::StdRng;
@@ -46,9 +46,7 @@ impl SetupSimple {
             setup_simple::<E>(shares_num, threshold, rng);
 
         // Ciphertext.commitment is already computed to match U
-        let ciphertext =
-            encrypt::<E>(SecretBox::new(msg.clone()), aad, &pubkey, rng)
-                .unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         // Creating decryption shares
         let decryption_shares: Vec<_> = contexts
@@ -235,8 +233,8 @@ pub fn bench_share_encrypt_decrypt(c: &mut Criterion) {
             move || {
                 let setup = setup.clone();
                 black_box(
-                    encrypt::<E>(
-                        SecretBox::new(setup.shared.msg),
+                    encrypt::<E, _>(
+                        &setup.shared.msg,
                         &setup.shared.aad,
                         &setup.shared.pubkey,
                         &mut rng,
@@ -249,7 +247,7 @@ pub fn bench_share_encrypt_decrypt(c: &mut Criterion) {
             let setup = SetupSimple::new(shares_num, msg_size, rng);
             move || {
                 black_box(
-                    decrypt_with_shared_secret::<E>(
+                    decrypt_raw::<E>(
                         &setup.shared.ciphertext,
                         &setup.shared.aad,
                         &setup.shared.shared_secret,

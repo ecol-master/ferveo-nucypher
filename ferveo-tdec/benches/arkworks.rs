@@ -7,12 +7,12 @@ use ark_bls12_381::{
     Bls12_381, Fr, G1Affine, G1Projective, G2Affine, G2Projective,
 };
 use ark_ec::{
-    pairing::{prepare_g1, prepare_g2, Pairing},
     AffineRepr, CurveGroup,
+    pairing::{Pairing, prepare_g1, prepare_g2},
 };
 use ark_ff::{BigInteger256, Field, UniformRand};
 use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion,
+    BenchmarkId, Criterion, black_box, criterion_group, criterion_main,
 };
 use itertools::izip;
 use rand::prelude::StdRng;

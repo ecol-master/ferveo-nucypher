@@ -1,7 +1,7 @@
 [package]
 name = "ferveo-nucypher-tdec"
 version = "0.4.0"
-edition = "2021"
+edition = "2024"
 authors = ["David Nuñez <david@nucypher.com>", "Piotr Roslaniec <p.roslaniec@gmail.com>", "Heliax AG <hello@heliax.dev>"]
 license = "GPL-3.0"
 description = "Threshold signature and encryption using group secret key"
@@ -10,10 +10,6 @@ readme = "README.md"
 
 [lib]
 bench = false
-
-[features]
-test-common = []
-api = []
 
 [dependencies]
 ark-bls12-381 = { workspace = true }
@@ -26,7 +22,6 @@ bincode = { workspace = true }
 chacha20poly1305 = { workspace = true }
 ferveo-common = { package = "ferveo-nucypher-common", path = "../ferveo-common", version = "^0.4.0" }
 itertools = { workspace = true }
-miracl_core = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -35,7 +30,8 @@ serde_with = { workspace = true }
 sha2 = { workspace = true }
 subproductdomain = { package = "subproductdomain-nucypher", path = "../subproductdomain", version = "^0.4.0" }
 thiserror = { workspace = true }
-zeroize = { workspace = true }
+zeroize = { workspace = true, features = ["derive"] }
+parity-scale-codec = {workspace = true, optional = true}
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["html_reports"] }
@@ -54,3 +50,9 @@ required-features = ["test-common"]
 name = "arkworks"
 path = "benches/arkworks.rs"
 harness = false
+
+[features]
+default = ["bls12_381", "parity-codec"]
+bls12_381 = []
+parity-codec = ["dep:parity-scale-codec"]
+test-common = []

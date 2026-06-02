@@ -1,40 +1,47 @@
-use std::ops::Mul;
+use std::{marker::PhantomData, ops::Mul};
 
-use ark_ec::{pairing::Pairing, AffineRepr};
+use ark_ec::{AffineRepr, pairing::Pairing};
 use ark_ff::{One, UniformRand};
 use ark_serialize::CanonicalSerialize;
 use chacha20poly1305::{
-    aead::{generic_array::GenericArray, Aead, KeyInit, Payload},
     ChaCha20Poly1305,
+    aead::{Aead, KeyInit, Payload, generic_array::GenericArray},
 };
 use ferveo_common::serialization;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use sha2::{digest::Digest, Sha256};
-use zeroize::ZeroizeOnDrop;
+use sha2::{Sha256, digest::Digest};
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::{
-    htp_bls12381_g2, DkgPublicKey, Error, PrivateKeyShare, Result, SecretBox,
-    SharedSecret,
+    Codec, DkgPublicKey, Error, PrivateKeyShare, Result, SharedSecret,
+    htp_bls12381_g2,
 };
 
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Ciphertext<E: Pairing> {
+pub struct Ciphertext<E: Pairing, T = Raw> {
     // U
     #[serde_as(as = "serialization::SerdeAs")]
     pub commitment: E::G1Affine,
-
     // W
     #[serde_as(as = "serialization::SerdeAs")]
     pub auth_tag: E::G2Affine,
-
-    // V
+    /// The ciphertext itself.
+    /// Created using [chacha20poly1305::ChaCha20Poly1305::encrypt].
     #[serde(with = "serde_bytes")]
     pub ciphertext: Vec<u8>,
+    /// Inner type the ciphertext bind to.
+    #[serde(skip)]
+    pub _type: PhantomData<T>,
 }
 
-impl<E: Pairing> Ciphertext<E> {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Raw;
+
+pub type RawCiphertext<E> = Ciphertext<E, Raw>;
+
+impl<E: Pairing, T> Ciphertext<E, T> {
     pub fn check(&self, aad: &[u8]) -> Result<bool> {
         self.header()?.check(aad)
     }
@@ -97,12 +104,39 @@ impl<E: Pairing> CiphertextHeader<E> {
     }
 }
 
-pub fn encrypt<E: Pairing>(
-    message: SecretBox<Vec<u8>>,
+/// Encodes a typed plaintext that implements [Codec] trait, then encrypt it.
+/// Use `decrypt_value` to recover the typed value after share combination.
+pub fn encrypt<E: Pairing, T: Codec>(
+    message: &T,
     aad: &[u8],
     pubkey: &DkgPublicKey<E>,
     rng: &mut impl rand::Rng,
-) -> Result<Ciphertext<E>> {
+) -> Result<Ciphertext<E, T>> {
+    let encoded = message.encode()?;
+    encrypt_raw_bytes(&encoded, aad, pubkey, rng)
+}
+
+/// Encrypt byte-like plaintext with associated data under the DKG public key.
+/// The plaintext type is tracked in [Ciphertext] but only bytes are encrypted.
+pub fn encrypt_raw<E: Pairing>(
+    message: impl AsRef<[u8]>,
+    aad: &[u8],
+    pubkey: &DkgPublicKey<E>,
+    rng: &mut impl rand::Rng,
+) -> Result<RawCiphertext<E>> {
+    encrypt_raw_bytes(message.as_ref(), aad, pubkey, rng)
+}
+
+/// Inner helper function that encrypts given slice of bytes.
+///
+/// Internally it encrypts the data using [chacha20poly1305::ChaCha20Poly1305]
+/// AEAD algorithm.
+fn encrypt_raw_bytes<E: Pairing, T>(
+    message: &[u8],
+    aad: &[u8],
+    pubkey: &DkgPublicKey<E>,
+    rng: &mut impl rand::Rng,
+) -> Result<Ciphertext<E, T>> {
     // r
     let rand_element = E::ScalarField::rand(rng);
     // g
@@ -119,10 +153,7 @@ pub fn encrypt<E: Pairing>(
     let nonce = Nonce::from_commitment::<E>(commitment)?;
     let shared_secret = SharedSecret::<E>(product);
 
-    let payload = Payload {
-        msg: message.as_secret().as_ref(),
-        aad,
-    };
+    let payload = Payload { msg: message, aad };
     let ciphertext = shared_secret_to_chacha(&shared_secret)?
         .encrypt(&nonce.0, payload) // TODO: Consider encrypt_in_place (#196)
         .map_err(Error::SymmetricEncryptionError)?
@@ -135,33 +166,79 @@ pub fn encrypt<E: Pairing>(
         .into();
 
     // TODO: Consider adding aad to the Ciphertext struct
-    Ok(Ciphertext::<E> {
+    Ok(Ciphertext::<E, T> {
         commitment,
         ciphertext,
         auth_tag,
+        _type: PhantomData,
     })
 }
 
-pub fn decrypt_symmetric<E: Pairing>(
-    ciphertext: &Ciphertext<E>,
+/// Typed wrapper function over [decrypt_with_shared_secret].
+/// Decrypts given [Ciphertext] and then try to decode it.
+pub fn decrypt<E, T>(
+    ciphertext: &Ciphertext<E, T>,
+    aad: &[u8],
+    shared_secret: &SharedSecret<E>,
+) -> Result<T>
+where
+    E: Pairing,
+    T: Codec,
+{
+    let plaintext = decrypt_with_shared_secret(ciphertext, aad, shared_secret)?;
+    T::decode(&plaintext)
+}
+
+/// Decrypt with a combined threshold shared secret and return plaintext bytes.
+/// This is the low-level byte API for interoperable callers.
+pub fn decrypt_raw<E: Pairing>(
+    ciphertext: &RawCiphertext<E>,
+    aad: &[u8],
+    shared_secret: &SharedSecret<E>,
+) -> Result<Vec<u8>> {
+    decrypt_with_shared_secret(ciphertext, aad, shared_secret)
+}
+
+/// Typed wrapper function over [decrypt_symmetric].
+/// Decrypts given [Ciphertext] and then tries to decode it.
+pub fn decrypt_symmetric<E: Pairing, T: Codec>(
+    ciphertext: &Ciphertext<E, T>,
     aad: &[u8],
     private_key: &PrivateKeyShare<E>,
-) -> Result<Vec<u8>> {
-    ciphertext.check(aad)?;
+) -> Result<T> {
     let shared_secret = E::pairing(
         E::G1Prepared::from(ciphertext.commitment),
         E::G2Prepared::from(private_key.0),
     )
     .0;
     let shared_secret = SharedSecret(shared_secret);
-    decrypt_with_shared_secret_unchecked(ciphertext, aad, &shared_secret)
+    let plaintext =
+        decrypt_with_shared_secret(ciphertext, aad, &shared_secret)?;
+    T::decode(&plaintext)
 }
 
-fn decrypt_with_shared_secret_unchecked<E: Pairing>(
-    ciphertext: &Ciphertext<E>,
+/// Decrypt directly with the private key and return plaintext bytes.
+/// This is mainly useful for non-threshold local checks and tests.
+pub fn decrypt_symmetric_raw<E: Pairing>(
+    ciphertext: &RawCiphertext<E>,
+    aad: &[u8],
+    private_key: &PrivateKeyShare<E>,
+) -> Result<Vec<u8>> {
+    let shared_secret = E::pairing(
+        E::G1Prepared::from(ciphertext.commitment),
+        E::G2Prepared::from(private_key.0),
+    )
+    .0;
+    let shared_secret = SharedSecret(shared_secret);
+    decrypt_with_shared_secret(ciphertext, aad, &shared_secret)
+}
+
+fn decrypt_with_shared_secret<E: Pairing, T>(
+    ciphertext: &Ciphertext<E, T>,
     aad: &[u8],
     shared_secret: &SharedSecret<E>,
 ) -> Result<Vec<u8>> {
+    ciphertext.check(aad)?;
     let nonce = Nonce::from_commitment::<E>(ciphertext.commitment)?;
     let ctxt = ciphertext.ciphertext.to_vec();
     let payload = Payload {
@@ -176,15 +253,6 @@ fn decrypt_with_shared_secret_unchecked<E: Pairing>(
     Ok(plaintext)
 }
 
-pub fn decrypt_with_shared_secret<E: Pairing>(
-    ciphertext: &Ciphertext<E>,
-    aad: &[u8],
-    shared_secret: &SharedSecret<E>,
-) -> Result<Vec<u8>> {
-    ciphertext.check(aad)?;
-    decrypt_with_shared_secret_unchecked(ciphertext, aad, shared_secret)
-}
-
 fn sha256(input: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(input);
@@ -195,12 +263,10 @@ fn sha256(input: &[u8]) -> [u8; 32] {
 pub fn shared_secret_to_chacha<E: Pairing>(
     shared_secret: &SharedSecret<E>,
 ) -> Result<ChaCha20Poly1305> {
-    let mut prf_key = SecretBox::new(Vec::new());
-    shared_secret
-        .0
-        .serialize_compressed(prf_key.as_mut_secret())?;
+    let mut prf_key = Zeroizing::new(Vec::new());
+    shared_secret.0.serialize_compressed(&mut *prf_key)?;
     Ok(ChaCha20Poly1305::new(GenericArray::from_slice(&sha256(
-        prf_key.as_secret(),
+        prf_key.as_slice(),
     ))))
 }
 
@@ -263,17 +329,16 @@ mod tests {
         let (pubkey, privkey, _) =
             setup_simple::<E>(threshold, shares_num, rng);
 
-        let ciphertext =
-            encrypt::<E>(SecretBox::new(msg.clone()), aad, &pubkey, rng)
-                .unwrap();
+        let ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
-        let plaintext = decrypt_symmetric(&ciphertext, aad, &privkey).unwrap();
+        let plaintext =
+            decrypt_symmetric_raw(&ciphertext, aad, &privkey).unwrap();
 
         assert_eq!(msg, plaintext);
 
         let bad: &[u8] = "bad-aad".as_bytes();
 
-        assert!(decrypt_symmetric(&ciphertext, bad, &privkey).is_err());
+        assert!(decrypt_symmetric_raw(&ciphertext, bad, &privkey).is_err());
     }
 
     #[test]
@@ -284,8 +349,7 @@ mod tests {
         let msg = "my-msg".as_bytes().to_vec();
         let aad: &[u8] = "my-aad".as_bytes();
         let (pubkey, _, _) = setup_simple::<E>(threshold, shares_num, rng);
-        let mut ciphertext =
-            encrypt::<E>(SecretBox::new(msg), aad, &pubkey, rng).unwrap();
+        let mut ciphertext = encrypt_raw::<E>(&msg, aad, &pubkey, rng).unwrap();
 
         // So far, the ciphertext is valid
         assert!(ciphertext.check(aad).is_ok());

@@ -1,25 +1,25 @@
 use std::{collections::HashMap, ops::Mul};
 
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, Group};
+use ark_ec::{AffineRepr, CurveGroup, PrimeGroup, pairing::Pairing};
 use ark_ff::{Field, Zero};
 use ark_poly::{
-    univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain,
-    Polynomial,
+    DenseUVPolynomial, EvaluationDomain, Polynomial,
+    univariate::DensePolynomial,
 };
 use ark_std::{One, UniformRand};
-use ferveo_common::{serialization, Keypair, PublicKey};
+use ferveo_common::{Keypair, PublicKey, serialization};
 use ferveo_tdec::{
-    prepare_combine_simple, BlindedKeyShare, CiphertextHeader,
-    DecryptionSharePrecomputed, DecryptionShareSimple, DomainPoint,
-    ShareCommitment,
+    BlindedKeyShare, CiphertextHeader, DecryptionSharePrecomputed,
+    DecryptionShareSimple, DomainPoint, ShareCommitment,
+    prepare_combine_simple,
 };
 use rand_core::RngCore;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 use subproductdomain::fast_multiexp;
 use zeroize::ZeroizeOnDrop;
 
-use crate::{batch_to_projective_g1, Error, Result};
+use crate::{Error, Result, batch_to_projective_g1};
 
 type InnerBlindedKeyShare<E> = ferveo_tdec::BlindedKeyShare<E>;
 
@@ -489,17 +489,17 @@ mod tests_refresh {
 
     use ark_ec::CurveGroup;
     use ark_poly::EvaluationDomain;
-    use ark_std::{test_rng, UniformRand, Zero};
+    use ark_std::{UniformRand, Zero, test_rng};
     use ferveo_common::Keypair;
     use ferveo_tdec::{
-        lagrange_basis_at, test_common::setup_simple, DomainPoint,
+        DomainPoint, lagrange_basis_at, test_common::setup_simple,
     };
-    use itertools::{zip_eq, Itertools};
+    use itertools::{Itertools, zip_eq};
     use test_case::test_case;
 
     use crate::{
-        test_common::*, HandoverTranscript, UpdatableBlindedKeyShare,
-        UpdateTranscript,
+        HandoverTranscript, UpdatableBlindedKeyShare, UpdateTranscript,
+        test_common::*,
     };
 
     type ScalarField =
@@ -661,7 +661,9 @@ mod tests_refresh {
         //         &not_enough_shares,
         //     )
         //     .unwrap();
-        assert_ne!(original_private_key_share, original_private_key_share);
+        // FIXME: placeholder until recovery tests are re-introduced (#193)
+        let _ = original_private_key_share;
+        panic!("recovery test is broken, see #193");
     }
 
     /// Ñ parties (where t <= Ñ <= N) jointly execute a "share recovery" algorithm, and the output is 1 new share.
@@ -753,7 +755,9 @@ mod tests_refresh {
         //         &updated_private_key_shares,
         //     )
         //     .unwrap();
-        assert_ne!(shared_private_key, shared_private_key);
+        // FIXME: placeholder until recovery tests are re-introduced (#193)
+        let _ = shared_private_key;
+        panic!("recovery test is broken, see #193");
     }
 
     /// Ñ parties (where t <= Ñ <= N) jointly execute a "share refresh" algorithm.
@@ -915,9 +919,11 @@ mod tests_refresh {
         );
 
         // Make sure handover transcript is valid. This is publicly verifiable.
-        assert!(handover_transcript
-            .validate(departing_public_context.share_commitment)
-            .unwrap());
+        assert!(
+            handover_transcript
+                .validate(departing_public_context.share_commitment)
+                .unwrap()
+        );
 
         // This portion shows that handover can be finalized by the departing participant,
         // and that the new blinded share contains the same private key share.

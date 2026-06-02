@@ -1,7 +1,7 @@
 [package]
 name = "ferveo-nucypher"
 version = "0.4.0"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0"
 repository = "https://github.com/nucypher/ferveo"
 readme = "README.md"
@@ -22,7 +22,7 @@ ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bincode = { workspace = true }
 ferveo-common = { package = "ferveo-nucypher-common", path = "../ferveo-common", version = "^0.4.0" }
-ferveo-tdec = { package = "ferveo-nucypher-tdec", path = "../ferveo-tdec", features = ["api", "test-common"], version = "^0.4.0" }
+ferveo-tdec = { package = "ferveo-nucypher-tdec", path = "../ferveo-tdec", features = ["bls12_381", "test-common"], version = "^0.4.0" }
 hex = { workspace = true }
 itertools = { workspace = true }
 measure_time = { workspace = true }
@@ -36,26 +36,14 @@ thiserror = { workspace = true }
 zeroize = { workspace = true, features = ["derive"] }
 generic-array = { workspace = true }
 derive_more = { workspace = true, features = ["from", "as_ref", "into"] }
-pyo3 = { workspace = true, features = ["macros", "multiple-pymethods"], optional = true }
-console_error_panic_hook = { workspace = true, optional = true }
-getrandom = { workspace = true, features = ["js"], optional = true }
-js-sys = { workspace = true, optional = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
 digest = { workspace = true, features = ["alloc"] }
 pprof = { workspace = true, features = ["flamegraph", "criterion"] }
 test-case = { workspace = true }
-console_error_panic_hook = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-wasm-bindgen = { workspace = true, features = ["serde-serialize"] }
 cargo-smart-release = { workspace = true }
-
-[features]
-bindings-python = ["pyo3"]
-bindings-wasm = ["console_error_panic_hook", "getrandom", "js-sys", "wasm-bindgen", "wasm-bindgen-derive"]
 
 [[example]]
 name = "bench_primitives_size"
@@ -73,7 +61,5 @@ harness = false
 
 [package.metadata.cargo-machete]
 ignored = [
-    "getrandom",
     "rand_old" # used by benchmarks/pairing.rs
 ]
-

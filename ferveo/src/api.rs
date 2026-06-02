@@ -4,29 +4,26 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ferveo_common::serialization;
 pub use ferveo_tdec::{
-    api::{
-        prepare_combine_simple, share_combine_precomputed,
-        share_combine_simple, DecryptionSharePrecomputed, Fr, G1Affine,
-        G1Prepared, G2Affine, SecretBox, E,
-    },
     DomainPoint,
+    bls12_381::{
+        DecryptionSharePrecomputed, E, Fr, G1Affine, G1Prepared, G2Affine,
+        prepare_combine_simple, share_combine_precomputed,
+        share_combine_simple,
+    },
 };
+use ferveo_tdec::{Raw, bls12_381 as tdec_bls12_381};
 use generic_array::{
-    typenum::{Unsigned, U48},
     GenericArray,
+    typenum::{U48, Unsigned},
 };
-use rand::{thread_rng, RngCore};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use rand::{RngCore, thread_rng};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 
-#[cfg(feature = "bindings-python")]
-use crate::bindings_python;
-#[cfg(feature = "bindings-wasm")]
-use crate::bindings_wasm;
 pub use crate::EthereumAddress;
 use crate::{
-    do_verify_aggregation, Error, PubliclyVerifiableSS, Result,
-    UpdateTranscript,
+    Error, PubliclyVerifiableSS, Result, UpdateTranscript,
+    do_verify_aggregation,
 };
 
 pub type ValidatorPublicKey = ferveo_common::PublicKey<E>;
@@ -52,13 +49,13 @@ pub fn from_bytes<T: CanonicalDeserialize>(bytes: &[u8]) -> Result<T> {
 }
 
 pub fn encrypt(
-    message: SecretBox<Vec<u8>>,
+    message: impl AsRef<[u8]>,
     aad: &[u8],
     public_key: &DkgPublicKey,
 ) -> Result<Ciphertext> {
     let mut rng = thread_rng();
     let ciphertext =
-        ferveo_tdec::api::encrypt(message, aad, &public_key.0, &mut rng)?;
+        tdec_bls12_381::encrypt_raw(message, aad, &public_key.0, &mut rng)?;
     Ok(Ciphertext(ciphertext))
 }
 
@@ -67,18 +64,14 @@ pub fn decrypt_with_shared_secret(
     aad: &[u8],
     shared_secret: &SharedSecret,
 ) -> Result<Vec<u8>> {
-    ferveo_tdec::api::decrypt_with_shared_secret(
-        &ciphertext.0,
-        aad,
-        &shared_secret.0,
-    )
-    .map_err(Error::from)
+    tdec_bls12_381::decrypt_raw(&ciphertext.0, aad, &shared_secret.0)
+        .map_err(Error::from)
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Eq)]
-pub struct Ciphertext(ferveo_tdec::api::Ciphertext);
+pub struct Ciphertext<T = Raw>(tdec_bls12_381::Ciphertext<T>);
 
-impl Ciphertext {
+impl<T> Ciphertext<T> {
     pub fn header(&self) -> Result<CiphertextHeader> {
         Ok(CiphertextHeader(self.0.header()?))
     }
@@ -89,7 +82,7 @@ impl Ciphertext {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CiphertextHeader(ferveo_tdec::api::CiphertextHeader);
+pub struct CiphertextHeader(tdec_bls12_381::CiphertextHeader);
 
 /// The ferveo variant to use for the decryption share derivation.
 #[derive(
@@ -125,20 +118,6 @@ impl FerveoVariant {
     }
 }
 
-#[cfg(feature = "bindings-python")]
-impl From<bindings_python::FerveoVariant> for FerveoVariant {
-    fn from(variant: bindings_python::FerveoVariant) -> Self {
-        variant.0
-    }
-}
-
-#[cfg(feature = "bindings-wasm")]
-impl From<bindings_wasm::FerveoVariant> for FerveoVariant {
-    fn from(variant: bindings_wasm::FerveoVariant) -> Self {
-        variant.0
-    }
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DkgPublicKey(
     #[serde(bound(
@@ -151,7 +130,7 @@ pub struct DkgPublicKey(
 // TODO: Consider moving these implementation details to ferveo_tdec::DkgPublicKey - #197
 impl DkgPublicKey {
     pub fn to_bytes(&self) -> Result<GenericArray<u8, U48>> {
-        let as_bytes = to_bytes(&self.0 .0)?;
+        let as_bytes = to_bytes(&self.0.0)?;
         Ok(GenericArray::<u8, U48>::from_slice(&as_bytes).to_owned())
     }
 
@@ -403,7 +382,7 @@ impl AggregatedTranscript {
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DecryptionShareSimple {
-    share: ferveo_tdec::api::DecryptionShareSimple,
+    share: tdec_bls12_381::DecryptionShareSimple,
     #[serde_as(as = "serialization::SerdeAs")]
     domain_point: DomainPoint<E>,
 }
@@ -419,23 +398,22 @@ pub fn combine_shares_simple(shares: &[DecryptionShareSimple]) -> SharedSecret {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SharedSecret(pub ferveo_tdec::api::SharedSecret<E>);
+pub struct SharedSecret(pub ferveo_tdec::SharedSecret<E>);
 
 #[cfg(test)]
 mod test_ferveo_api {
 
-    use ark_std::{iterable::Iterable, UniformRand};
-    use ferveo_tdec::SecretBox;
-    use itertools::{izip, Itertools};
+    use ark_std::{UniformRand, iterable::Iterable};
+    use itertools::{Itertools, izip};
     use rand::{
-        prelude::{SliceRandom, StdRng},
         SeedableRng,
+        prelude::{SliceRandom, StdRng},
     };
     use test_case::test_case;
 
     use crate::{
         api::*,
-        test_common::{gen_address, gen_keypairs, AAD, MSG, TAU},
+        test_common::{AAD, MSG, TAU, gen_address, gen_keypairs},
     };
 
     type TestInputs =
@@ -527,9 +505,7 @@ mod test_ferveo_api {
         let dkg_public_key = local_aggregate.public_key();
 
         // In the meantime, the client creates a ciphertext and decryption request
-        let ciphertext =
-            encrypt(SecretBox::new(MSG.to_vec()), AAD, &dkg_public_key)
-                .unwrap();
+        let ciphertext = encrypt(MSG, AAD, &dkg_public_key).unwrap();
 
         // In precomputed variant, client selects a specific subset of validators to create
         // decryption shares
@@ -557,9 +533,9 @@ mod test_ferveo_api {
                 .unwrap();
                 let server_aggregate =
                     dkg.aggregate_transcripts(messages).unwrap();
-                assert!(server_aggregate
-                    .verify(validators_num, messages)
-                    .unwrap());
+                assert!(
+                    server_aggregate.verify(validators_num, messages).unwrap()
+                );
 
                 // And then each validator creates their own decryption share
                 server_aggregate
@@ -630,8 +606,7 @@ mod test_ferveo_api {
         let public_key = local_aggregate.public_key();
 
         // In the meantime, the client creates a ciphertext and decryption request
-        let ciphertext =
-            encrypt(SecretBox::new(MSG.to_vec()), AAD, &public_key).unwrap();
+        let ciphertext = encrypt(MSG, AAD, &public_key).unwrap();
 
         // Having aggregated the transcripts, the validators can now create decryption shares
         let mut decryption_shares: Vec<_> =
@@ -648,9 +623,11 @@ mod test_ferveo_api {
                     .unwrap();
                     let server_aggregate =
                         dkg.aggregate_transcripts(messages).unwrap();
-                    assert!(server_aggregate
-                        .verify(validators_num, messages)
-                        .unwrap());
+                    assert!(
+                        server_aggregate
+                            .verify(validators_num, messages)
+                            .unwrap()
+                    );
                     server_aggregate
                         .create_decryption_share_simple(
                             &dkg,
@@ -763,9 +740,10 @@ mod test_ferveo_api {
                 messages[security_threshold as usize - 2].1.clone(),
             ),
         ];
-        assert!(dkg
-            .aggregate_transcripts(&messages_with_duplicated_transcript)
-            .is_err());
+        assert!(
+            dkg.aggregate_transcripts(&messages_with_duplicated_transcript)
+                .is_err()
+        );
 
         let messages_with_duplicated_transcript = [
             (
@@ -777,9 +755,10 @@ mod test_ferveo_api {
                 messages[security_threshold as usize - 1].1.clone(),
             ),
         ];
-        assert!(dkg
-            .aggregate_transcripts(&messages_with_duplicated_transcript)
-            .is_err());
+        assert!(
+            dkg.aggregate_transcripts(&messages_with_duplicated_transcript)
+                .is_err()
+        );
 
         // Unexpected transcripts in the aggregate or transcripts from a different ritual
         // Using same DKG parameters, but different DKG instances and validators
@@ -917,14 +896,15 @@ mod test_ferveo_api {
         let dkg = dkgs[0].clone();
         let server_aggregate =
             dkg.aggregate_transcripts(messages.as_slice()).unwrap();
-        assert!(server_aggregate
-            .verify(validators_num, messages.as_slice())
-            .unwrap());
+        assert!(
+            server_aggregate
+                .verify(validators_num, messages.as_slice())
+                .unwrap()
+        );
 
         // Create an initial shared secret for testing purposes
         let public_key = server_aggregate.public_key();
-        let ciphertext =
-            encrypt(SecretBox::new(MSG.to_vec()), AAD, &public_key).unwrap();
+        let ciphertext = encrypt(MSG, AAD, &public_key).unwrap();
         let ciphertext_header = ciphertext.header().unwrap();
         let transcripts = messages
             .iter()
@@ -985,9 +965,11 @@ mod test_ferveo_api {
             .clone()
             .aggregate_transcripts(messages.as_slice())
             .unwrap();
-        assert!(aggregated_transcript
-            .verify(validators_num, messages.as_slice())
-            .unwrap());
+        assert!(
+            aggregated_transcript
+                .verify(validators_num, messages.as_slice())
+                .unwrap()
+        );
 
         // We need to save this domain point to be user in the recovery testing scenario
         let mut domain_points = dkgs[0].0.domain_point_map();
@@ -1199,9 +1181,11 @@ mod test_ferveo_api {
                     .clone()
                     .aggregate_transcripts(messages.as_slice())
                     .unwrap();
-                assert!(aggregate
-                    .verify(validators_num, messages.as_slice())
-                    .unwrap());
+                assert!(
+                    aggregate
+                        .verify(validators_num, messages.as_slice())
+                        .unwrap()
+                );
 
                 // Each participant updates their own DKG aggregate
                 // using the UpdateTranscripts of all participants

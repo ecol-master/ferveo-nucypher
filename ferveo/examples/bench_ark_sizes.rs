@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeSet,
-    fs::{create_dir_all, OpenOptions},
+    fs::{OpenOptions, create_dir_all},
     io::prelude::*,
     path::PathBuf,
 };

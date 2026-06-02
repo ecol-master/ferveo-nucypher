@@ -1,10 +1,10 @@
 use std::ops::Mul;
 
-use ark_ec::{pairing::Pairing, CurveGroup, Group};
+use ark_ec::{CurveGroup, PrimeGroup, pairing::Pairing};
 use ark_ff::Field;
 use ferveo_common::serialization;
 use itertools::izip;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_with::serde_as;
 
 use crate::{
@@ -36,12 +36,12 @@ impl<E: Pairing> ValidatorShareChecksum<E> {
         Ok(Self { checksum })
     }
 
-    pub fn verify(
+    pub fn verify<T>(
         &self,
         decryption_share: &E::TargetField,
         share_aggregate: &E::G2Affine,
         validator_public_key: &E::G2Affine,
-        ciphertext: &Ciphertext<E>,
+        ciphertext: &Ciphertext<E, T>,
     ) -> bool {
         // See https://github.com/nucypher/ferveo/issues/42#issuecomment-1398953777
         // D_i == e(C_i, Y_i)
@@ -115,11 +115,11 @@ impl<E: Pairing> DecryptionShareSimple<E> {
         })
     }
     /// Verify that the decryption share is valid.
-    pub fn verify(
+    pub fn verify<T>(
         &self,
         share_aggregate: &E::G2Affine,
         validator_public_key: &E::G2Affine,
-        ciphertext: &Ciphertext<E>,
+        ciphertext: &Ciphertext<E, T>,
     ) -> bool {
         self.validator_checksum.verify(
             &self.decryption_share,
@@ -198,11 +198,11 @@ impl<E: Pairing> DecryptionSharePrecomputed<E> {
     }
 
     /// Verify that the decryption share is valid.
-    pub fn verify(
+    pub fn verify<T>(
         &self,
         share_aggregate: &E::G2Affine,
         validator_public_key: &E::G2Affine,
-        ciphertext: &Ciphertext<E>,
+        ciphertext: &Ciphertext<E, T>,
     ) -> bool {
         self.validator_checksum.verify(
             &self.decryption_share,
@@ -213,9 +213,9 @@ impl<E: Pairing> DecryptionSharePrecomputed<E> {
     }
 }
 
-pub fn verify_decryption_shares_simple<E: Pairing>(
+pub fn verify_decryption_shares_simple<E: Pairing, T>(
     pub_contexts: &Vec<PublicDecryptionContextSimple<E>>,
-    ciphertext: &Ciphertext<E>,
+    ciphertext: &Ciphertext<E, T>,
     decryption_shares: &Vec<DecryptionShareSimple<E>>,
 ) -> bool {
     let blinded_key_shares = &pub_contexts
